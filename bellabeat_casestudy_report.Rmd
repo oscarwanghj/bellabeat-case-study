@@ -1,0 +1,165 @@
+---
+title: "BellaBeat Case Study"
+author: "Oscar (Hong-Jyun) Wang"
+date: "7/Sep/2025"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapse: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse) # metapackage of all tidyverse packages
+library(lubridate)
+library(dplyr)
+library(knitr)
+setwd("/Users/wanghongjyun/Desktop/DA/DA_R_Practice/R_Practice/Fitabase Data 3.12.16-4.11.16/")
+```
+
+
+# Business Scenario
+Bellabeat, a high-tech company that manufactures health-focused smart products for women. Bellabeat wants to become a larger player in the global smart device market. As a data analyst, I am asked to analyse smart device data to gain insight into how consumers are using their smart devices. The insights will then help guide marketing strategy for the company.
+ 
+# Business Task
+Identify the potential trends and inform the marketing strategy, and gain insight into how consumers use non-Bellabeat smart devices. 
+ 
+**1. What are some trends in smart device usage?**
+
+**2. How could these trends help influence Bellabeat marketing strategy?**
+
+
+# Data Preparation and Cleaning
+First, dataset is cleaned and prepared by converting the data type, filtering the useful info, and deleting the irrelavant field.
+
+```{r}
+#Data Cleaning for Activity Dataset
+activity <- read.csv("dailyActivity_merged.csv")
+activity <- activity %>% 
+    mutate(ActivityDate = mdy(ActivityDate),
+           Weekdays = wday(ActivityDate, label = TRUE, abbr = FALSE),
+           Id = as.character(Id)) %>%
+    select(-LoggedActivitiesDistance,
+           -SedentaryActiveDistance) %>%
+    filter(TotalSteps > 0,
+           SedentaryMinutes > 0,
+           Calories > 0)
+```
+
+# Data Analysis
+
+### Analysis 1 - Understanding of User Types
+**The goal is to gain an understanding of the user types based on daily walking steps.**
+
+Users are catogorised based on their daily steps to **understand the proportions of smart device users**, where users with daily steps less than 3000 are regarded as less, between 3000 to 6000 as normal, between 6000 to 10000 as healthy, and over 10000 steps as very healthy. Afterwards, calculate the user proportions based on their activity type, and visualise the proportions.
+
+```{r}
+#Data Analysis - Categorise the Smart Device Users
+user_summary <- activity %>% 
+    group_by(Id) %>%
+    summarize(TotalSteps = mean(TotalSteps, na.rm = TRUE),
+              SedentaryMinutes = mean(SedentaryMinutes, na.rm = TRUE),
+              Calories = mean(Calories, na.rm = TRUE)) %>%
+    mutate(ActiveType = case_when(
+        TotalSteps <= 3000 ~ "Less",
+        TotalSteps <= 6000 ~ "Normal",
+        TotalSteps <= 10000 ~ "Healthy",
+        TRUE ~ "VeryHealthy"))
+#head(user_summary)
+```
+
+
+```{r}
+#Create a User Proportion Table 
+library(gt)
+user_proportion <- user_summary %>% 
+    group_by(ActiveType) %>%
+    count() %>%
+    mutate(proportion = n/34,
+           ActiveType = factor(ActiveType, 
+                               levels = c("Less", "Normal", "Healthy", "VeryHealthy")),
+           percentage = paste0(round(proportion * 100, 1), "%")) %>%
+    arrange(ActiveType) 
+
+
+cat("The Proportion of User Types\n")
+user_proportion
+```
+
+```{r}
+#Create a Pie Chart for User Active Type
+ggplot(data = user_proportion, mapping = aes(x="", y=proportion, fill=ActiveType))+
+    geom_col(width = 1, color = 'white')+
+    coord_polar(theta = "y")+
+    labs(title = "User Activity Type (Pie Chart)")+
+    geom_text(aes(label = percentage),
+              position = position_stack(vjust = 0.5), size = 7)+
+    theme_void()+
+    scale_fill_manual(values = c("Less" = "red",
+                                 "Normal" = "orange",
+                                 "Healthy" = "lightgreen",
+                                 "VeryHealthy" = "green"),
+                      labels = c("Less" = "Less (<3000 steps)",
+                                 "Normal" = "Normal (3000-6000 steps)",
+                                 "Healthy" = "Healthy (6000-10000 steps)",
+                                 "VeryHealthy" = "VeryHealthy (>10000steps)"))+
+    guides(fill = guide_legend(title = "Activity Type"))+
+    theme(legend.text = element_text(size = 8))  # increase font size if needed
+```
+
+
+### Analysis 2 - Observe the Activity Trends
+**The goal here is to understand how to implement the marketing strategies to potential users.**
+
+Firstly, daily steps of users are analysed in detail to check **which day people walk most frequently.** Afterwards, **daily steps are aggregated and converted to find the time people walk the most.** These two info will inform Bellabeat regarding the advertisement.
+
+```{r, message=FALSE}
+#Data Analysis - Looking for Weekdays Walking Trends
+
+weekdays_steps <- activity %>%
+    group_by(Id, Weekdays) %>%
+    summarize(UserWeekdaySteps = mean(TotalSteps)) %>%
+    ungroup() %>%
+    group_by(Weekdays) %>%
+    summarize(WeekdaySteps = mean(UserWeekdaySteps))
+
+ggplot(data = weekdays_steps)+
+    geom_col(aes(x=Weekdays, y=WeekdaySteps))+
+    coord_cartesian(ylim = c(6000, 9000))+
+    labs(title = "People's Daily Walking Trend by Weekdays",
+         y = "Users' Daily Average Steps by Weekdays")
+```
+
+```{r, message = FALSE}
+#Data Analysis - Looking for Hourly Walking Trends
+hr_steps <- read.csv("hourlySteps_merged.csv")
+hr_steps <- hr_steps %>% 
+    mutate(ActivityHour = floor_date(mdy_hms(ActivityHour), unit = "hour"),
+           Hour = hour(ActivityHour),
+           Id = as.character(Id))
+steps_sum <- hr_steps %>%
+    group_by(Id, Hour) %>%
+    summarize(UserHourlySteps = mean(StepTotal)) %>%
+    ungroup() %>%
+    group_by(Hour) %>%
+    summarize(HourlySteps = mean(UserHourlySteps))
+
+ggplot(data = steps_sum)+
+    geom_col(mapping = aes(x = Hour, y = HourlySteps))+
+    labs(title = "People's Daily Walking Trends by Hours",
+         y = "Walking Steps")
+```
+
+
+# Result
+The result shows most of the smart device users have a normal or healthy daily walking trends, whose steps are from 3000-6000 (normal) and 6000-10000 (healthy), amounting to 73.5% of smart device users. The result also shows that people walks the most around 12pm, 7pm, 8pm everyday on Monday, Wednesday, and Thursday. 
+
+# Recommendations
+
+### 1. Marketing Strategy - Targeting the Right Audience 
+From user analysis, around 73% of the smart device users take a stroll with 3000 to 10000 steps every day, meaning these users have moderately daily physical activities. Compared to sedentary individuals (daily steps < 3000) or habitual exercisers (daily steps > 10000), the users deserve better attention, whose characteristics and habits are different and require tailored marketing strategies. For example, these users typically want to maintain healthy habits under limited resources (e.g. time), so providing smart device that tracks daily steps can be attractive to them. 
+
+### 2. Marketing Strategy - Maximising Impact During Meal Time On Weekdays
+After accurately targeting the potential users, Bellabeat should maximise their marketing exposure to them. According to the data, Bellabeat can maximise the impact if they launch ads at 12pm, 7pm and 8pm on Monday, Wednesday, and Thursday, at which the population walks the most. In fact, these time overlaps with people's meal time, so the result might reflect people's walking activity when they are going for meals. Therefore, launching ads on restaurants, streets, and on TV during these time can reach maximum exposure and bring extra benefits.
