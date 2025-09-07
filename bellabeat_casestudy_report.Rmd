@@ -1,13 +1,13 @@
 ---
 title: "BellaBeat Case Study"
 author: "Oscar (Hong-Jyun) Wang"
-date: "7/Sep/2025"
+date: "`r Sys.Date()`"
 output:
   html_document:
     toc: true
     toc_float:
       collapse: true
-    theme: flatly
+    theme: journal
 ---
 
 ```{r setup, include=FALSE}
@@ -32,7 +32,7 @@ Identify the potential trends and inform the marketing strategy, and gain insigh
 
 
 # Data Preparation and Cleaning
-First, dataset is cleaned and prepared by converting the data type, filtering the useful info, and deleting the irrelavant field.
+First, dataset is cleaned and prepared by converting data types, filtering useful info, and deleting  irrelevant fields.
 
 ```{r}
 #Data Cleaning for Activity Dataset
@@ -67,7 +67,6 @@ user_summary <- activity %>%
         TotalSteps <= 6000 ~ "Normal",
         TotalSteps <= 10000 ~ "Healthy",
         TRUE ~ "VeryHealthy"))
-#head(user_summary)
 ```
 
 
@@ -83,8 +82,6 @@ user_proportion <- user_summary %>%
            percentage = paste0(round(proportion * 100, 1), "%")) %>%
     arrange(ActiveType) 
 
-
-cat("The Proportion of User Types\n")
 user_proportion
 ```
 
